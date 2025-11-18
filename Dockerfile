@@ -1,7 +1,7 @@
 FROM debian:latest
 
+RUN apt update && apt install -y ca-certificates caddy curl && rm -rf /var/lib/apt/lists/*
 RUN bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
-RUN apt update && apt install -y ca-certificates caddy && rm -rf /var/lib/apt/lists/*
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
