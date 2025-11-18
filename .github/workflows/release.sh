@@ -3,7 +3,7 @@
 set -euxo pipefail
 
 IMAGE="ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF_NAME}"
-OUTPUT_PREFIX="image-${GITHUB_REF_NAME}"
+OUTPUT_PREFIX="xhttp-tunnel"
 
 PLATFORMS=("linux/amd64" "linux/arm64")
 
