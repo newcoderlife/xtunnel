@@ -25,6 +25,42 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      - name: Build smoke image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          pull: true
+          platforms: linux/amd64
+          tags: xtunnel:ci
+          provenance: false
+          cache-from: type=gha
+
+      - name: Smoke test server mode
+        run: |
+          set -eux
+          cid=$(docker run -d -e DOMAIN=localhost -e VTEP_IP=127.0.0.1 xtunnel:ci)
+          cleanup() { status=$?; docker logs "$cid" || true; docker rm -f "$cid" || true; exit "$status"; }
+          trap cleanup EXIT
+          sleep 5
+          test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
+
+      - name: Smoke test client mode
+        run: |
+          set -eux
+          cid=$(docker run -d \
+            -e PEERS=s1 \
+            -e S1_DOMAIN=localhost \
+            -e S1_FORWARD_UUID=00000000-0000-4000-8000-000000000001 \
+            -e S1_REVERSE_UUID=00000000-0000-4000-8000-000000000002 \
+            -e S1_LOCAL_VTEP_IP=127.0.0.2 \
+            xtunnel:ci)
+          cleanup() { status=$?; docker logs "$cid" || true; docker rm -f "$cid" || true; exit "$status"; }
+          trap cleanup EXIT
+          sleep 5
+          test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
