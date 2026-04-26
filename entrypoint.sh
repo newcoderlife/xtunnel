@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/sh
 # shellcheck disable=SC2086
 set -ex
 umask 077
@@ -45,4 +45,9 @@ trap 'trap - EXIT TERM INT; set +e; kill "$CADDY_PID" "$XRAY_PID" 2>/dev/null; w
 trap 'exit 143' TERM INT
 XDG_DATA_HOME="$D/caddy" caddy run --config "$C" & CADDY_PID=$!
 xray run -config "$D/server.json" & XRAY_PID=$!
-set +e; wait -n "$CADDY_PID" "$XRAY_PID" 2>/dev/null; exit $?
+set +e
+while :; do
+  kill -0 "$CADDY_PID" 2>/dev/null || { wait "$CADDY_PID"; exit $?; }
+  kill -0 "$XRAY_PID" 2>/dev/null || { wait "$XRAY_PID"; exit $?; }
+  sleep 1
+done
