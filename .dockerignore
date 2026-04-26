@@ -1,0 +1,12 @@
+.git
+.github
+.vscode
+.history
+
+.DS_Store
+Thumbs.db
+
+AGENTS.md
+README.md
+.gitignore
+.dockerignore

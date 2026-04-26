@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Check entrypoint syntax
+        run: docker run --rm -v "$PWD:/work" -w /work alpine:3.21 ash -n entrypoint.sh
+
+      - name: Check entrypoint script
+        run: shellcheck -s sh -e SC3044,SC2154 entrypoint.sh
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: shell
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: false
+          pull: true
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
