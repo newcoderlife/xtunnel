@@ -29,7 +29,7 @@ jobs:
         run: docker run --rm -v "$PWD:/work" -w /work alpine:3.21 ash -n entrypoint.sh
 
       - name: Check entrypoint script
-        run: shellcheck -s sh -e SC3044,SC2154 entrypoint.sh
+        run: shellcheck -s sh entrypoint.sh
 
   docker:
     runs-on: ubuntu-latest
