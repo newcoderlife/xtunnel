@@ -1,5 +1,5 @@
 # Stage 1: Download Xray binary
-FROM alpine:3.21 AS builder
+FROM alpine:3.23 AS builder
 
 ARG TARGETARCH=amd64
 ARG TARGETVARIANT=
@@ -20,7 +20,7 @@ RUN apk add --no-cache ca-certificates curl unzip \
     && rm -f /tmp/xray.zip
 
 # Stage 2: Minimal runtime image
-FROM alpine:3.21
+FROM alpine:3.23
 
 RUN apk add --no-cache ca-certificates caddy libcap \
     && addgroup -S tunnel && adduser -S -G tunnel tunnel \
