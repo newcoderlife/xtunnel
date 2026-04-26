@@ -94,8 +94,8 @@ docker run -d \
 
 ## 发布
 
-匹配 `v*` 的版本 tag 会发布 GitHub Container Registry 镜像，支持 `linux/amd64`、`linux/arm64`、`linux/arm/v7`：
+匹配 `v*` 的版本 tag 会发布 GitHub Container Registry 镜像，支持 `linux/amd64`、`linux/arm64`、`linux/arm/v7`。默认使用最新正式镜像：
 
 ```sh
-docker pull ghcr.io/newcoderlife/xtunnel:v0.0.1
+docker pull ghcr.io/newcoderlife/xtunnel:latest
 ```
