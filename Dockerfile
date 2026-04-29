@@ -3,7 +3,7 @@ ARG CADDY_VERSION=2.11.2
 ARG CADDY_DNS_CLOUDFLARE_VERSION=v0.2.4
 
 # Stage 1: Download Xray binary
-FROM --platform=$BUILDPLATFORM alpine:3.23 AS xray-builder
+FROM --platform=$BUILDPLATFORM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS xray-builder
 
 ARG TARGETARCH=amd64
 ARG TARGETVARIANT=
@@ -24,7 +24,7 @@ RUN apk add --no-cache ca-certificates curl unzip \
     && rm -f /tmp/xray.zip
 
 # Stage 2: Build Caddy with Cloudflare DNS-01 support
-FROM --platform=$BUILDPLATFORM caddy:${CADDY_VERSION}-builder-alpine AS caddy-builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.2-builder-alpine@sha256:113249e07ac54f02da3e395a7150124562af1a3129b0b1498ddbb39f5b3fc430 AS caddy-builder
 ARG CADDY_VERSION
 ARG CADDY_DNS_CLOUDFLARE_VERSION
 ARG TARGETOS
@@ -42,7 +42,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --with "github.com/caddy-dns/cloudflare@${CADDY_DNS_CLOUDFLARE_VERSION}"
 
 # Stage 3: Minimal runtime image
-FROM alpine:3.23
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 
 RUN apk add --no-cache ca-certificates libcap \
     && addgroup -S tunnel && adduser -S -G tunnel tunnel \
