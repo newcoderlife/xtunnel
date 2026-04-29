@@ -1,5 +1,9 @@
+# syntax=docker/dockerfile:1.7
+ARG CADDY_VERSION=2.11.2
+ARG CADDY_DNS_CLOUDFLARE_VERSION=v0.2.4
+
 # Stage 1: Download Xray binary
-FROM alpine:3.23 AS builder
+FROM --platform=$BUILDPLATFORM alpine:3.23 AS xray-builder
 
 ARG TARGETARCH=amd64
 ARG TARGETVARIANT=
@@ -19,21 +23,39 @@ RUN apk add --no-cache ca-certificates curl unzip \
     && chmod +x /usr/local/bin/xray \
     && rm -f /tmp/xray.zip
 
-# Stage 2: Minimal runtime image
+# Stage 2: Build Caddy with Cloudflare DNS-01 support
+FROM --platform=$BUILDPLATFORM caddy:${CADDY_VERSION}-builder-alpine AS caddy-builder
+ARG CADDY_VERSION
+ARG CADDY_DNS_CLOUDFLARE_VERSION
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    export CGO_ENABLED=0 GOOS="${TARGETOS:-linux}" GOARCH="${TARGETARCH}"; \
+    case "${TARGETARCH}/${TARGETVARIANT}" in \
+        arm/v7) export GOARM=7 ;; \
+        arm/v6) export GOARM=6 ;; \
+    esac; \
+    xcaddy build "v${CADDY_VERSION}" --output /usr/bin/caddy \
+    --with "github.com/caddy-dns/cloudflare@${CADDY_DNS_CLOUDFLARE_VERSION}"
+
+# Stage 3: Minimal runtime image
 FROM alpine:3.23
 
-RUN apk add --no-cache ca-certificates caddy libcap \
+RUN apk add --no-cache ca-certificates libcap \
     && addgroup -S tunnel && adduser -S -G tunnel tunnel \
-    && setcap cap_net_bind_service=+ep /usr/sbin/caddy \
     && mkdir -p /data/caddy && chown -R tunnel:tunnel /data
 
-COPY --from=builder /usr/local/bin/xray /usr/local/bin/xray
-COPY --from=builder /usr/local/share/xray /usr/local/share/xray
-RUN setcap cap_net_bind_service=+ep /usr/local/bin/xray
+COPY --from=xray-builder /usr/local/bin/xray /usr/local/bin/xray
+COPY --from=xray-builder /usr/local/share/xray /usr/local/share/xray
+COPY --from=caddy-builder /usr/bin/caddy /usr/local/bin/caddy
+RUN setcap cap_net_bind_service=+ep /usr/local/bin/xray \
+    && setcap cap_net_bind_service=+ep /usr/local/bin/caddy
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
-VOLUME /data
-EXPOSE 80 443 4789/udp
+EXPOSE 443/udp
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD pidof xray >/dev/null && { [ -n "${PEERS:-}" ] || pidof caddy >/dev/null; } || exit 1

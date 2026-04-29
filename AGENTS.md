@@ -1,6 +1,6 @@
 # xtunnel Agent Instructions
 
-**xtunnel** is a minimal Docker image for RouterOS VXLAN over Xray VLESS xHTTP/TLS. It generates all runtime config from environment variables.
+**xtunnel** is a minimal Docker image for RouterOS VXLAN over Xray VLESS xHTTP/H3. It generates all runtime config from environment variables.
 
 ## Rules
 
@@ -26,7 +26,7 @@
 - Client mode requires `PEERS` plus `<PEER>_DOMAIN`, `<PEER>_FORWARD_UUID`, `<PEER>_REVERSE_UUID`, and `<PEER>_LOCAL_VTEP_IP` for each peer.
 - Peer variable names are derived by uppercasing peer names and replacing `-` with `_`.
 - Use `dokodemo-door` for local VXLAN UDP ingress and `freedom` with `redirect`, `sendThrough`, and `ipsBlocked: []` for traffic back to RouterOS.
-- Keep xHTTP in explicit `stream-up` mode with TLS/H2 on clients and Caddy terminating TLS on servers.
+- Keep xHTTP in HTTP/3 mode with TLS/H3 on clients and Caddy terminating H3/TLS on servers.
 - Multi-server support should stay client-local: add one client VTEP IP and one peer block per server; existing servers should not need changes.
 - The CI workflow validates pull requests with ShellCheck and `linux/amd64,linux/arm64,linux/arm/v7` Docker builds.
 - The release workflow publishes multi-arch `ghcr.io/${{ github.repository }}` images for version tags.
