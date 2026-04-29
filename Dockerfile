@@ -54,6 +54,7 @@ COPY --from=caddy-builder /usr/bin/caddy /usr/local/bin/caddy
 RUN setcap cap_net_bind_service=+ep /usr/local/bin/xray \
     && setcap cap_net_bind_service=+ep /usr/local/bin/caddy
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
+COPY LICENSE /usr/share/licenses/xtunnel/LICENSE
 
 EXPOSE 443/udp
 
