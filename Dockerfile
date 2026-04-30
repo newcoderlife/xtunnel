@@ -5,10 +5,11 @@ ARG CADDY_DNS_CLOUDFLARE_VERSION=v0.2.4
 # Stage 1: Download Xray binary
 FROM --platform=$BUILDPLATFORM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS xray-builder
 
-ARG TARGETARCH=amd64
-ARG TARGETVARIANT=
+ARG TARGETARCH
+ARG TARGETVARIANT
 ARG XRAY_VERSION=v26.3.27
-RUN apk add --no-cache ca-certificates curl unzip \
+RUN : "${TARGETARCH:?TARGETARCH is required}" \
+    && apk add --no-cache ca-certificates curl unzip \
     && case "${TARGETARCH}/${TARGETVARIANT}" in \
         amd64/) XRAY_ARCH="64"; XRAY_SHA256="23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae" ;; \
         arm64/|arm64/v8) XRAY_ARCH="arm64-v8a"; XRAY_SHA256="4d30283ae614e3057f730f67cd088a42be6fdf91f8639d82cb69e48cde80413c" ;; \
