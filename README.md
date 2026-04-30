@@ -1,5 +1,11 @@
 # xtunnel
 
+[![CI](https://github.com/newcoderlife/xtunnel/actions/workflows/ci.yml/badge.svg)](https://github.com/newcoderlife/xtunnel/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/newcoderlife/xtunnel/actions/workflows/codeql.yml/badge.svg)](https://github.com/newcoderlife/xtunnel/actions/workflows/codeql.yml)
+[![GHCR](https://img.shields.io/badge/image-ghcr.io%2Fnewcoderlife%2Fxtunnel-blue)](https://github.com/newcoderlife/xtunnel/pkgs/container/xtunnel)
+[![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64%20%7C%20arm%2Fv7-informational)](https://github.com/newcoderlife/xtunnel/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/github/license/newcoderlife/xtunnel)](LICENSE)
+
 `xtunnel` 是一个用于 RouterOS VXLAN tunnel 的极简 Docker 镜像。RouterOS 继续使用原生 VXLAN UDP 4789，容器只负责把 VXLAN 包通过 Xray VLESS xHTTP/H3 封装到 HTTPS/QUIC 链路里。
 
 ## 模型
