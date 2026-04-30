@@ -18,9 +18,7 @@ RUN : "${TARGETARCH:?TARGETARCH is required}" \
       esac \
     && curl -fsSL "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-${XRAY_ARCH}.zip" -o /tmp/xray.zip \
     && printf '%s  %s\n' "$XRAY_SHA256" /tmp/xray.zip | sha256sum -c - \
-    && mkdir -p /usr/local/share/xray \
     && unzip -j /tmp/xray.zip xray -d /usr/local/bin \
-    && unzip -j /tmp/xray.zip geoip.dat geosite.dat -d /usr/local/share/xray \
     && chmod +x /usr/local/bin/xray \
     && rm -f /tmp/xray.zip
 
@@ -50,10 +48,8 @@ RUN apk add --no-cache ca-certificates libcap \
     && mkdir -p /data/caddy && chown -R tunnel:tunnel /data
 
 COPY --from=xray-builder /usr/local/bin/xray /usr/local/bin/xray
-COPY --from=xray-builder /usr/local/share/xray /usr/local/share/xray
 COPY --from=caddy-builder /usr/bin/caddy /usr/local/bin/caddy
-RUN setcap cap_net_bind_service=+ep /usr/local/bin/xray \
-    && setcap cap_net_bind_service=+ep /usr/local/bin/caddy
+RUN setcap cap_net_bind_service=+ep /usr/local/bin/caddy
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 COPY LICENSE /usr/share/licenses/xtunnel/LICENSE
 
