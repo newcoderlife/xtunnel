@@ -71,6 +71,8 @@ jobs:
           trap cleanup EXIT
           sleep 5
           test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
+          docker exec "$cid" grep -F 'handle @xhttp' /data/Caddyfile
+          docker exec "$cid" grep -F 'reverse_proxy 127.0.0.1:8080' /data/Caddyfile
 
       - name: Smoke test client mode
         run: |
