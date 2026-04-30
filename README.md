@@ -11,7 +11,7 @@
 ## 模型
 
 ```text
-RouterOS VXLAN <-> xtunnel 本地 VTEP IP <-> VLESS xHTTP/H3 <-> xtunnel server VTEP IP <-> RouterOS VXLAN
+RouterOS VXLAN -> 本机 xtunnel 容器 -> VLESS xHTTP/H3 -> 对端 xtunnel 容器 -> 对端 RouterOS VXLAN
 ```
 
 - 设置了 `PEERS` 时，容器以 client 模式运行。
@@ -21,6 +21,8 @@ RouterOS VXLAN <-> xtunnel 本地 VTEP IP <-> VLESS xHTTP/H3 <-> xtunnel server 
 - Caddy 使用 Cloudflare DNS-01 自动签发/续期证书，不使用 HTTP-01 或 TLS-ALPN-01。
 - Caddy 和 Xray 默认输出 `info` 级运行日志到 container logs；默认不启用访问日志。
 - `VXLAN_PORT` 默认是 `4789`，通常不需要改。RouterOS VXLAN 对端通过 VTEP IP 识别，不是通过 `IP:port` 识别。
+- RouterOS 到容器的 `172.18.0.0/24` 是每台设备本机的 transport 网段，不是跨站业务网段，可以在不同站点重复使用。
+- VXLAN 业务 IP 需要单独配置在 `vxlan-xtunnel` 上。例如 home/client 使用 `192.168.66.1/24`，出口 server 使用 `192.168.66.2/24`、`192.168.66.3/24` 等。
 
 ## Server
 
@@ -69,17 +71,29 @@ docker run -d \
 
 ## RouterOS VXLAN
 
-在 RouterOS 上创建一个 VXLAN interface，然后为 xtunnel 暴露出来的每个 peer IP 添加一个静态 VTEP：
+在 RouterOS 上创建一个 VXLAN interface，然后为本机 xtunnel 容器暴露出来的每个 peer IP 添加一个静态 VTEP：
 
 ```routeros
-/interface/vxlan add name=vxlan-xtunnel vni=100 port=4789
+/interface/vxlan add name=vxlan-xtunnel vni=100 port=4789 mtu=1280 local-address=172.18.0.1
 /interface/vxlan/vteps add interface=vxlan-xtunnel remote-ip=172.18.0.2
 /interface/vxlan/vteps add interface=vxlan-xtunnel remote-ip=172.18.0.3
 ```
 
+`local-address` 是 RouterOS veth 上的本机地址，`remote-ip` 是本机 xtunnel 容器地址。它们不是 VXLAN 业务地址，也不是远端 RouterOS 的公网或内网地址。xtunnel 容器收到本机 VXLAN UDP 包后，才通过 Xray 把它送到远端容器。
+
 在 server 侧 RouterOS 上，remote VTEP 使用该 server 容器的 `VTEP_IP`。在 client 侧 RouterOS 上，remote VTEP 使用每个 `*_LOCAL_VTEP_IP`。RouterOS 的容器 veth 必须实际分配这些地址，否则 Xray 无法绑定或从这些地址发包。
 
 这些 IP 是每台 RouterOS 本机的 container 网段地址，不需要跨站点唯一。单 server 场景通常直接用 RouterOS `172.18.0.1`、xtunnel 容器 `172.18.0.2`；client 连接多个 server 时，再给每个 peer 追加一个本地 VTEP IP，例如 `172.18.0.3`、`172.18.0.4`。
+
+跨站点 IPv4 连通需要另配 overlay 业务 IP，不能复用 `172.18.0.0/24`：
+
+```routeros
+# home/client
+/ip/address add address=192.168.66.1/24 interface=vxlan-xtunnel
+
+# exit server
+/ip/address add address=192.168.66.2/24 interface=vxlan-xtunnel
+```
 
 ## 环境变量
 
@@ -103,10 +117,12 @@ docker run -d \
 
 1. 部署新的 server，设置自己的 `DOMAIN`、`VTEP_IP` 和 `CLOUDFLARE_API_TOKEN`。
 2. 生成两组 UUID，分别作为 server 的 `FORWARD_UUID` 和 `REVERSE_UUID`。
-3. 在 client 的 `PEERS` 里追加新的 peer 名。
-4. 给该 peer 增加四个 client 变量。
-5. 给 client 容器 veth 再分配一个本地 IP。
-6. 在 RouterOS VXLAN 里再加一个静态 VTEP，指向这个新的本地 IP。
+3. 给 server 的 `vxlan-xtunnel` 分配下一个 overlay 业务 IP，例如 `192.168.66.3/24`。
+4. 在 client 的 `PEERS` 里追加新的 peer 名。
+5. 给该 peer 增加四个 client 变量。
+6. 给 client 容器 veth 再分配一个本地 transport IP，例如 `172.18.0.3/24`。
+7. 在 client 的 RouterOS VXLAN 里再加一个静态 VTEP，指向这个新的本地 transport IP。
+8. 在 client 上按需要添加低优先级默认路由，例如 `gateway=192.168.66.3 distance=11`。
 
 已有 server 不需要修改。
 
