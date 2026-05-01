@@ -2,9 +2,12 @@
 set -e; umask 077
 
 D=/data; C=$D/Caddyfile; P=; K=; PD=; PF=; PR=; PL=; PP=; PS=; CADDY_PID=; XRAY_PID=
-: "${XHTTP_PATH:=/tunnel}" "${VXLAN_PORT:=4789}" "${PEERS:=}"
+: "${XHTTP_PATH:=/tunnel}" "${VXLAN_PORT:=4789}" "${PEERS:=}" "${XHTTP_XMUX_MAX_CONNECTIONS:=}"
 ROUTER_IP=${ROUTER_IP:-$(ip route | awk '/default/ {print $3; exit}')}
 : "${ROUTER_IP:?ROUTER_IP is required}"
+if [ -n "$XHTTP_XMUX_MAX_CONNECTIONS" ]; then
+  case $XHTTP_XMUX_MAX_CONNECTIONS in 0|*[!0-9]*) echo "Invalid XHTTP_XMUX_MAX_CONNECTIONS: $XHTTP_XMUX_MAX_CONNECTIONS" >&2; exit 1;; esac
+fi
 mkdir -p "$D/caddy"
 
 peer() {
@@ -16,7 +19,8 @@ peer() {
   : "${PD:?${K}_DOMAIN is required}" "${PF:?${K}_FORWARD_UUID is required}" "${PR:?${K}_REVERSE_UUID is required}" "${PL:?${K}_LOCAL_VTEP_IP is required}"
 }
 peers() { printf '%s\n' "$PEERS" | tr ',' '\n'; }
-stream() { printf '"streamSettings":{"network":"xhttp","security":"tls","tlsSettings":{"serverName":"%s","fingerprint":"chrome"},"xhttpSettings":{"path":"%s"}}' "$PS" "$PP"; }
+xmux() { [ -z "$XHTTP_XMUX_MAX_CONNECTIONS" ] || printf ',"xmux":{"maxConnections":%s,"hMaxRequestTimes":"600-900","hMaxReusableSecs":"1800-3000"}' "$XHTTP_XMUX_MAX_CONNECTIONS"; }
+stream() { printf '"streamSettings":{"network":"xhttp","security":"tls","tlsSettings":{"serverName":"%s","fingerprint":"chrome"},"xhttpSettings":{"path":"%s"' "$PS" "$PP"; xmux; printf '}}'; }
 vless() { printf '{"tag":"%s","protocol":"vless","settings":{"address":"%s","port":443,"id":"%s","encryption":"none"' "$1" "$PD" "$2"; [ -z "${3:-}" ] || printf ',"reverse":{"tag":"%s"}' "$3"; printf '},'; stream; printf '}'; }
 inbounds() { s=; peers | while IFS= read -r P; do [ -z "$P" ] && continue; peer "$P"; printf '%s{"tag":"from-router-%s","listen":"%s","port":%s,"protocol":"dokodemo-door","settings":{"address":"127.0.0.1","port":%s,"network":"udp"}}' "$s" "$P" "$PL" "$VXLAN_PORT" "$VXLAN_PORT"; s=,; done; }
 outbounds() { peers | while IFS= read -r P; do [ -z "$P" ] && continue; peer "$P"; printf ','; vless "to-server-$P" "$PF"; printf ','; vless "reverse-$P" "$PR" "from-server-$P"; printf ',{"tag":"to-router-%s","sendThrough":"%s","protocol":"freedom","settings":{"redirect":"%s:%s","ipsBlocked":[]}}' "$P" "$PL" "$ROUTER_IP" "$VXLAN_PORT"; done; }
