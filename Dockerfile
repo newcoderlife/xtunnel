@@ -42,7 +42,7 @@ COPY LICENSE /usr/share/licenses/xtunnel/LICENSE
 EXPOSE 443
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD pidof xray >/dev/null && { [ -n "${PEERS:-}" ] || pidof caddy >/dev/null; } || exit 1
+    CMD pidof xray >/dev/null || exit 1
 
 USER tunnel
 ENTRYPOINT ["/entrypoint.sh"]
