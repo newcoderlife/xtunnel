@@ -9,7 +9,7 @@ server 模式不设置 `PEERS`。下面按这个约定写：
 - 这个 server 的 overlay 业务 IP 是 `192.168.66.2/24`。后续 server 可以顺序使用 `192.168.66.3/24`、`192.168.66.4/24`。
 - 外置存储是 `disk1`。
 
-把域名、Cloudflare token 和两个 UUID 换成自己的，然后按顺序执行。
+把域名和两个 UUID 换成自己的，然后按顺序执行。server 需要公网 `tcp/443` 可达，DNS A/AAAA 记录应直接指向 server；如果使用 Cloudflare，请把记录设为 DNS only。
 
 ## RouterOS Container
 
@@ -38,14 +38,13 @@ server 模式不设置 `PEERS`。下面按这个约定写：
 /container/config/set registry-url=https://ghcr.io tmpdir=disk1/tmp
 /container/envs/add list=ENV_XTUNNEL key=DOMAIN value="s1.example.com"
 /container/envs/add list=ENV_XTUNNEL key=VTEP_IP value="172.18.0.2"
-/container/envs/add list=ENV_XTUNNEL key=CLOUDFLARE_API_TOKEN value="cf_api_token_here"
 /container/envs/add list=ENV_XTUNNEL key=FORWARD_UUID value="00000000-0000-4000-8000-000000000001"
 /container/envs/add list=ENV_XTUNNEL key=REVERSE_UUID value="00000000-0000-4000-8000-000000000002"
 /container/add remote-image=newcoderlife/xtunnel:latest interface=veth-xtunnel root-dir=disk1/xtunnel/root envlist=ENV_XTUNNEL name=xtunnel user=0:0 dns=1.1.1.1 start-on-boot=yes logging=yes
 /container/start [find where name="xtunnel"]
 ```
 
-这里不挂 `/data`，生成配置和 Caddy 证书会保存在 `root-dir` 里的 `/data` 路径下。只要不删除这个 container/root-dir，重启后还在。
+这里不挂 `/data`，生成配置和 Caddy 证书会保存在 `root-dir` 里的 `/data` 路径下。只要不删除这个 container/root-dir，重启后还在。Caddy 使用默认 ACME 通过公网 `tcp/443` 取证书，不需要 Cloudflare API token。
 
 `172.18.0.1/24` 和 `172.18.0.2/24` 只用于 RouterOS 到本机容器的 transport。不要把它们当作跨站业务 IP，也不要用它们测试远端连通性。跨站 IPv4 测试应该使用 `192.168.66.x`。
 
@@ -56,17 +55,17 @@ server 模式不设置 `PEERS`。下面按这个约定写：
 如果你已有 firewall，只把这些规则放到最终 drop 前面即可。
 
 ```routeros
-/ip/firewall/filter/add chain=forward action=accept connection-nat-state=dstnat protocol=udp dst-address=172.18.0.2 dst-port=443 in-interface-list=WAN comment="xtunnel H3"
+/ip/firewall/filter/add chain=forward action=accept connection-nat-state=dstnat protocol=tcp dst-address=172.18.0.2 dst-port=443 in-interface-list=WAN comment="xtunnel HTTPS"
 /ip/firewall/filter/add chain=forward action=accept in-interface-list=LAN
 
-/ip/firewall/nat/add chain=dstnat action=dst-nat protocol=udp dst-port=443 in-interface-list=WAN to-addresses=172.18.0.2 to-ports=443
+/ip/firewall/nat/add chain=dstnat action=dst-nat protocol=tcp dst-port=443 in-interface-list=WAN to-addresses=172.18.0.2 to-ports=443
 /ip/firewall/nat/add chain=srcnat action=masquerade in-interface-list=LAN out-interface-list=WAN
 
 /ip/firewall/mangle/add chain=forward action=change-mss protocol=tcp tcp-flags=syn new-mss=clamp-to-pmtu out-interface=vxlan-xtunnel
 /ip/firewall/mangle/add chain=forward action=change-mss protocol=tcp tcp-flags=syn new-mss=clamp-to-pmtu in-interface=vxlan-xtunnel
 ```
 
-UDP full cone 可选；需要时把下面两条加在 `masquerade` 前面，UDP 443 的 `dst-nat` 保持在 generic `endpoint-independent-nat` 前面：
+UDP full cone 可选；需要时把下面两条加在 `masquerade` 前面：
 
 ```routeros
 /ip/firewall/nat/add chain=srcnat action=endpoint-independent-nat protocol=udp in-interface-list=LAN out-interface-list=WAN
@@ -108,11 +107,10 @@ UDP full cone 可选；需要时把下面两条加在 `masquerade` 前面，UDP 
 docker run -d \
   --name xtunnel \
   --restart unless-stopped \
-  -p 443:443/udp \
+  -p 443:443 \
   -v xtunnel:/data \
   -e DOMAIN=s1.example.com \
   -e VTEP_IP=172.18.0.2 \
-  -e CLOUDFLARE_API_TOKEN=cf_api_token_here \
   -e FORWARD_UUID=00000000-0000-4000-8000-000000000001 \
   -e REVERSE_UUID=00000000-0000-4000-8000-000000000002 \
   ghcr.io/newcoderlife/xtunnel:latest

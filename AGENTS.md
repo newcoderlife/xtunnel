@@ -1,13 +1,13 @@
 # xtunnel Agent Instructions
 
-**xtunnel** is a minimal Docker image for RouterOS VXLAN over Xray VLESS xHTTP/H3. It generates all runtime config from environment variables.
+**xtunnel** is a minimal Docker image for RouterOS VXLAN over Xray VLESS xHTTP/TLS/H2. It generates all runtime config from environment variables.
 
 ## Rules
 
 - Keep changes focused; this repository is intentionally small and should stay easy to audit.
 - Do not introduce application frameworks, package managers, or build systems unless the user explicitly asks for them.
 - Prefer Alpine BusyBox `ash` in `entrypoint.sh`; avoid Bash-specific features.
-- Preserve `set -ex`; startup tracing is an intentional feature.
+- Preserve `set -e`; startup tracing is intentionally disabled to keep RouterOS container logs quiet.
 - Do not support custom mounted Xray or Caddy config files.
 - Preserve `/data` as the persistent runtime state directory for UUIDs, generated configs, and Caddy data.
 - Preserve server mode's two-process runtime model: Caddy handles HTTPS and path routing, Xray listens on `127.0.0.1:8080`.
@@ -26,7 +26,7 @@
 - Client mode requires `PEERS` plus `<PEER>_DOMAIN`, `<PEER>_FORWARD_UUID`, `<PEER>_REVERSE_UUID`, and `<PEER>_LOCAL_VTEP_IP` for each peer.
 - Peer variable names are derived by uppercasing peer names and replacing `-` with `_`.
 - Use `dokodemo-door` for local VXLAN UDP ingress and `freedom` with `redirect`, `sendThrough`, and `ipsBlocked: []` for traffic back to RouterOS.
-- Keep xHTTP in HTTP/3 mode with TLS/H3 on clients and Caddy terminating H3/TLS on servers.
+- Keep xHTTP on TLS/H2 over TCP/443. Do not add H3/UDP 443 or xHTTP mode/ALPN toggles unless explicitly requested.
 - Multi-server support should stay client-local: add one client VTEP IP and one peer block per server; existing servers should not need changes.
 - The CI workflow validates pull requests with ShellCheck and `linux/amd64,linux/arm64,linux/arm/v7` Docker builds.
 - The release workflow publishes multi-arch `ghcr.io/${{ github.repository }}` images for version tags.
