@@ -32,7 +32,7 @@ client 模式设置 `PEERS`。下面按这个约定写：
 /ip/address/add address=172.18.0.1/24 interface=veth-xtunnel
 /interface/list/member/add list=LAN interface=veth-xtunnel
 
-/interface/vxlan/add name=vxlan-xtunnel vni=100 port=4789 mtu=1280 local-address=172.18.0.1
+/interface/vxlan/add name=vxlan-xtunnel vni=100 port=4789 mtu=1200 local-address=172.18.0.1 rem-csum=both hw=no
 /interface/vxlan/vteps/add interface=vxlan-xtunnel remote-ip=172.18.0.2
 /ip/address/add address=192.168.66.1/24 interface=vxlan-xtunnel comment="xtunnel overlay"
 /interface/list/member/add list=WAN interface=vxlan-xtunnel
@@ -50,6 +50,8 @@ client 模式设置 `PEERS`。下面按这个约定写：
 这里不挂 `/data`，生成配置会保存在 `root-dir` 里的 `/data` 路径下。只要不删除这个 container/root-dir，重启后还在。
 
 `172.18.0.1/24` 和 `172.18.0.2/24` 只用于 RouterOS 到本机容器的 transport。它们可以和 server 上的 transport 网段重复。跨站 IPv4 业务地址是 `192.168.66.0/24`，client 用 `.1`，server 从 `.2` 开始。
+
+`vxlan-xtunnel` 的 `rem-csum=both` 和 `hw=no` 需要和所有 server 保持一致。RouterOS 本机发出的 TCP 流量（例如 SSH、BGP、bandwidth-test）经过 VXLAN 时可能依赖 Remote Checksum Offload；启用 RCO 并关闭 VXLAN hardware offload 可以避免远端收到未完成的内层 TCP checksum。
 
 添加低优先级默认路由，让第一个出口 server 作为备用出口。这里的 `distance` 数值要大于本机 PPPoE/WAN 默认路由，确保优先级更低：
 
@@ -134,7 +136,9 @@ UDP full cone 可选；需要时把下面两条加在 `masquerade` 前面。由�
 
 - `local-address=172.18.0.1`
 - `remote-ip=172.18.0.2`
-- `mtu=1280`
+- `mtu=1200`
+- `rem-csum=both`
+- `hw=no`
 - `192.168.66.1/24` 配在 `vxlan-xtunnel`
 - `vxlan-xtunnel` 在 `WAN`
 - `0.0.0.0/0 gateway=192.168.66.2 distance=10`

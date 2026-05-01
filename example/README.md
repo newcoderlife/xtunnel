@@ -15,5 +15,6 @@
 - 出口 server 从 `192.168.66.2/24` 开始顺序编号，例如第一个出口 server 使用 `192.168.66.2/24`。
 - client 把 `vxlan-xtunnel` 放进 `WAN` interface-list，并添加低优先级默认路由指向出口 server。
 - server 把 `vxlan-xtunnel` 放进 `LAN` interface-list，复用 `LAN -> WAN` masquerade 作为出口 NAT。
+- RouterOS VXLAN 使用 `mtu=1200 rem-csum=both hw=no`。`rem-csum=both` 用于处理 RouterOS 本机 TCP over VXLAN 的 Remote Checksum Offload，`hw=no` 避免 hardware offload 忽略 RCO 设置。
 
 注意：RouterOS VXLAN 的 `local-address` 和 `/interface/vxlan/vteps remote-ip` 是 underlay VTEP 地址。在这个项目里，`remote-ip` 指向的是本机 xtunnel 容器地址，例如 `172.18.0.2`，不是远端 server。真正跨站点的业务 IP 是 `192.168.66.x`。
