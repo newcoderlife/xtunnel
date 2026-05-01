@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 ARG CADDY_VERSION=2.11.2
-ARG CADDY_DNS_CLOUDFLARE_VERSION=v0.2.4
+ARG CADDY_IMAGE_DIGEST=sha256:834468128c7696cec0ceea6172f7d692daf645ae51983ca76e39da54a97c570d
 
 # Stage 1: Download Xray binary
 FROM --platform=$BUILDPLATFORM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS xray-builder
@@ -22,23 +22,9 @@ RUN : "${TARGETARCH:?TARGETARCH is required}" \
     && chmod +x /usr/local/bin/xray \
     && rm -f /tmp/xray.zip
 
-# Stage 2: Build Caddy with Cloudflare DNS-01 support
-FROM --platform=$BUILDPLATFORM caddy:2.11.2-builder-alpine@sha256:113249e07ac54f02da3e395a7150124562af1a3129b0b1498ddbb39f5b3fc430 AS caddy-builder
+# Stage 2: Use official Caddy release binary
+FROM --platform=$TARGETPLATFORM caddy:${CADDY_VERSION}-alpine@${CADDY_IMAGE_DIGEST} AS caddy-release
 ARG CADDY_VERSION
-ARG CADDY_DNS_CLOUDFLARE_VERSION
-ARG TARGETOS
-ARG TARGETARCH
-ARG TARGETVARIANT
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    set -eux; \
-    export CGO_ENABLED=0 GOOS="${TARGETOS:-linux}" GOARCH="${TARGETARCH}"; \
-    case "${TARGETARCH}/${TARGETVARIANT}" in \
-        arm/v7) export GOARM=7 ;; \
-        arm/v6) export GOARM=6 ;; \
-    esac; \
-    xcaddy build "v${CADDY_VERSION}" --output /usr/bin/caddy \
-    --with "github.com/caddy-dns/cloudflare@${CADDY_DNS_CLOUDFLARE_VERSION}"
 
 # Stage 3: Minimal runtime image
 FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
@@ -48,12 +34,12 @@ RUN apk add --no-cache ca-certificates libcap \
     && mkdir -p /data/caddy && chown -R tunnel:tunnel /data
 
 COPY --from=xray-builder /usr/local/bin/xray /usr/local/bin/xray
-COPY --from=caddy-builder /usr/bin/caddy /usr/local/bin/caddy
+COPY --from=caddy-release /usr/bin/caddy /usr/local/bin/caddy
 RUN setcap cap_net_bind_service=+ep /usr/local/bin/caddy
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 COPY LICENSE /usr/share/licenses/xtunnel/LICENSE
 
-EXPOSE 443/udp
+EXPOSE 443
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD pidof xray >/dev/null && { [ -n "${PEERS:-}" ] || pidof caddy >/dev/null; } || exit 1

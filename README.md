@@ -6,20 +6,20 @@
 [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64%20%7C%20arm%2Fv7-informational)](https://github.com/newcoderlife/xtunnel/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/github/license/newcoderlife/xtunnel)](LICENSE)
 
-`xtunnel` 是一个用于 RouterOS VXLAN tunnel 的极简 Docker 镜像。RouterOS 继续使用原生 VXLAN UDP 4789，容器只负责把 VXLAN 包通过 Xray VLESS xHTTP/H3 封装到 HTTPS/QUIC 链路里。
+`xtunnel` 是一个用于 RouterOS VXLAN tunnel 的极简 Docker 镜像。RouterOS 继续使用原生 VXLAN UDP 4789，容器只负责把 VXLAN 包通过 Xray VLESS xHTTP over TLS/H2 封装到 HTTPS/TCP 链路里。
 
 ## 模型
 
 ```text
-RouterOS VXLAN -> 本机 xtunnel 容器 -> VLESS xHTTP/H3 -> 对端 xtunnel 容器 -> 对端 RouterOS VXLAN
+RouterOS VXLAN -> 本机 xtunnel 容器 -> VLESS xHTTP/TLS/H2 -> 对端 xtunnel 容器 -> 对端 RouterOS VXLAN
 ```
 
 - 设置了 `PEERS` 时，容器以 client 模式运行。
 - 没有设置 `PEERS` 时，容器以 server 模式运行。
 - 不支持挂载自定义 Xray/Caddy 配置。`/data/Caddyfile`、`/data/server.json`、`/data/client.json` 每次启动都会重新生成。
-- tunnel 只使用 HTTP/3 over QUIC，server 对外只需要开放 `443/udp`。
-- Caddy 使用 Cloudflare DNS-01 自动签发/续期证书，不使用 HTTP-01 或 TLS-ALPN-01。
-- Caddy 和 Xray 默认输出 `info` 级运行日志到 container logs；默认不启用访问日志。
+- tunnel 只使用 `tcp/443`。server 需要公网 `tcp/443` 可达，DNS A/AAAA 记录应直接指向 server 公网地址。
+- Caddy 使用默认 ACME 自动签发/续期证书。若域名托管在 Cloudflare，记录必须是 DNS only，不要启用代理云朵。
+- Caddy 和 Xray 默认输出低噪声运行日志到 container logs；默认不启用访问日志。
 - `VXLAN_PORT` 默认是 `4789`，通常不需要改。RouterOS VXLAN 对端通过 VTEP IP 识别，不是通过 `IP:port` 识别。
 - RouterOS 到容器的 `172.18.0.0/24` 是每台设备本机的 transport 网段，不是跨站业务网段，可以在不同站点重复使用。
 - VXLAN 业务 IP 需要单独配置在 `vxlan-xtunnel` 上。例如 home/client 使用 `192.168.66.1/24`，出口 server 使用 `192.168.66.2/24`、`192.168.66.3/24` 等。
@@ -32,11 +32,10 @@ RouterOS VXLAN -> 本机 xtunnel 容器 -> VLESS xHTTP/H3 -> 对端 xtunnel 容�
 docker run -d \
   --name xtunnel \
   --restart unless-stopped \
-  -p 443:443/udp \
+  -p 443:443 \
   -v xtunnel:/data \
   -e DOMAIN=s1.example.com \
   -e VTEP_IP=172.18.0.2 \
-  -e CLOUDFLARE_API_TOKEN=cf_api_token_here \
   -e FORWARD_UUID=00000000-0000-4000-8000-000000000001 \
   -e REVERSE_UUID=00000000-0000-4000-8000-000000000002 \
   ghcr.io/newcoderlife/xtunnel:latest
@@ -99,7 +98,6 @@ docker run -d \
 
 - `DOMAIN`：server 域名。server 必填。
 - `VTEP_IP`：server 侧容器作为 VXLAN VTEP 使用的 IP。server 必填。
-- `CLOUDFLARE_API_TOKEN`：server 专用，Cloudflare DNS-01 API token。server 必填，需要对 `DOMAIN` 所在 zone 有 `Zone.Zone:Read` 和 `Zone.DNS:Edit` 权限。
 - `FORWARD_UUID`：server 专用，client 到 server 方向 UUID；推荐手动设置，不传会自动生成到 `/data/forward_uuid`。
 - `REVERSE_UUID`：server 专用，server 到 client 方向 UUID；推荐手动设置，不传会自动生成到 `/data/reverse_uuid`。
 - `PEERS`：逗号分隔的 peer 名。设置后启用 client 模式。
@@ -115,7 +113,7 @@ docker run -d \
 
 ## 新增 Server
 
-1. 部署新的 server，设置自己的 `DOMAIN`、`VTEP_IP` 和 `CLOUDFLARE_API_TOKEN`。
+1. 部署新的 server，设置自己的 `DOMAIN` 和 `VTEP_IP`，并确保公网 `tcp/443` 和 DNS 直连记录已就绪。
 2. 生成两组 UUID，分别作为 server 的 `FORWARD_UUID` 和 `REVERSE_UUID`。
 3. 给 server 的 `vxlan-xtunnel` 分配下一个 overlay 业务 IP，例如 `192.168.66.3/24`。
 4. 在 client 的 `PEERS` 里追加新的 peer 名。

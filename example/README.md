@@ -5,7 +5,7 @@
 - [server.md](server.md)：server 侧 RouterOS Container 配置、变量说明和 Docker 参考命令。
 - [client.md](client.md)：client 侧 RouterOS Container 配置、单 server、多 server 和 Docker 参考命令。
 
-示例里的 IP、域名、UUID 和 Cloudflare API token 都需要替换成你自己的值。RouterOS 的容器 veth 也必须实际拥有示例中的 VTEP IP，否则 Xray 无法绑定本地 UDP 入口或按指定源地址发包。server 只需要开放 `443/udp`，xtunnel 只使用 HTTP/3 over QUIC 承载公网 tunnel。
+示例里的 IP、域名和 UUID 都需要替换成你自己的值。RouterOS 的容器 veth 也必须实际拥有示例中的 VTEP IP，否则 Xray 无法绑定本地 UDP 入口或按指定源地址发包。server 需要公网 `tcp/443` 可达，DNS A/AAAA 记录应直接指向 server；如果使用 Cloudflare，请把记录设为 DNS only。
 
 这些示例使用三层 routed overlay，不做二层桥接：
 

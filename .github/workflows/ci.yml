@@ -66,7 +66,7 @@ jobs:
       - name: Smoke test server mode
         run: |
           set -eux
-          cid=$(docker run -d -e DOMAIN=localhost -e VTEP_IP=127.0.0.1 -e CLOUDFLARE_API_TOKEN=0000000000000000000000000000000000000000 xtunnel:ci)
+          cid=$(docker run -d -e DOMAIN=localhost -e VTEP_IP=127.0.0.1 xtunnel:ci)
           cleanup() { status=$?; docker logs "$cid" || true; docker rm -f "$cid" || true; exit "$status"; }
           trap cleanup EXIT
           sleep 5
