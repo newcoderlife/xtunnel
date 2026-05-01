@@ -71,8 +71,8 @@ jobs:
           trap cleanup EXIT
           sleep 5
           test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
-          docker exec "$cid" grep -F 'handle @xhttp' /data/Caddyfile
-          docker exec "$cid" grep -F 'reverse_proxy 127.0.0.1:8080' /data/Caddyfile
+          docker exec "$cid" grep -F 'listen: :443' /data/server.yaml
+          docker exec "$cid" grep -F 'type: password' /data/server.yaml
 
       - name: Smoke test client mode
         run: |
@@ -88,6 +88,7 @@ jobs:
           trap cleanup EXIT
           sleep 5
           test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
+          docker exec "$cid" grep -F 'udpForwarding:' /data/client-s1.yaml
 
       - name: Scan smoke image
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
