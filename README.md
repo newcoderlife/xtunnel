@@ -74,7 +74,7 @@ docker run -d \
 在 RouterOS 上创建一个 VXLAN interface，然后为本机 xtunnel 容器暴露出来的每个 peer IP 添加一个静态 VTEP：
 
 ```routeros
-/interface/vxlan add name=vxlan-xtunnel vni=100 port=4789 mtu=1280 local-address=172.18.0.1
+/interface/vxlan add name=vxlan-xtunnel vni=100 port=4789 mtu=1200 local-address=172.18.0.1 rem-csum=both hw=no
 /interface/vxlan/vteps add interface=vxlan-xtunnel remote-ip=172.18.0.2
 /interface/vxlan/vteps add interface=vxlan-xtunnel remote-ip=172.18.0.3
 ```
