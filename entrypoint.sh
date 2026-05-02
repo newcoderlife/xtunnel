@@ -3,6 +3,7 @@ set -ex
 
 D=/data; P=; K=; PD=; PL=
 : "${VXLAN_PORT:=4789}" "${PEERS:=}" "${SS2022_METHOD:=2022-blake3-aes-128-gcm}" "${SS2022_PASSWORD:=YuV9jUXztSPJ4QgMZrFMdw==}"
+: "${SS2022_SERVER_PORT:=16384}" "${SS2022_REMOTE_ADDRESS:=127.0.0.1}" "${SS2022_REMOTE_PORT:=$VXLAN_PORT}"
 ROUTER_IP=${ROUTER_IP:-$(ip route | awk '/default/ {print $3; exit}')}
 : "${ROUTER_IP:?ROUTER_IP is required}"
 mkdir -p "$D"
@@ -24,7 +25,7 @@ if [ -n "${PEERS:-}" ]; then
     cat >"$D/client-$P.json" <<EOF
 {
   "server": "$PD",
-  "server_port": 443,
+  "server_port": $SS2022_SERVER_PORT,
   "method": "$SS2022_METHOD",
   "password": "$SS2022_PASSWORD",
   "timeout": 600,
@@ -33,8 +34,8 @@ if [ -n "${PEERS:-}" ]; then
       "protocol": "tunnel",
       "local_address": "$PL",
       "local_port": $VXLAN_PORT,
-      "forward_address": "$ROUTER_IP",
-      "forward_port": $VXLAN_PORT,
+      "forward_address": "$SS2022_REMOTE_ADDRESS",
+      "forward_port": $SS2022_REMOTE_PORT,
       "mode": "udp_only"
     }
   ]
@@ -52,7 +53,7 @@ fi
 cat >"$D/server.json" <<EOF
 {
   "server": "0.0.0.0",
-  "server_port": 443,
+  "server_port": $SS2022_SERVER_PORT,
   "method": "$SS2022_METHOD",
   "password": "$SS2022_PASSWORD",
   "mode": "tcp_and_udp",

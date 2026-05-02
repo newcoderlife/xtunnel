@@ -34,7 +34,7 @@ RUN setcap cap_net_bind_service=+ep /usr/local/bin/ssserver
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 COPY LICENSE /usr/share/licenses/xtunnel/LICENSE
 
-EXPOSE 443/tcp 443/udp
+EXPOSE 16384/udp
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD pidof ssserver >/dev/null || pidof sslocal >/dev/null || exit 1
