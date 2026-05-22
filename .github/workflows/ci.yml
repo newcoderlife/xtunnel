@@ -63,31 +63,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max,ignore-error=true
 
-      - name: Smoke test server mode
-        run: |
-          set -eux
-          cid=$(docker run -d -e DOMAIN=localhost -e VTEP_IP=127.0.0.1 xtunnel:ci)
-          cleanup() { status=$?; docker logs "$cid" || true; docker rm -f "$cid" || true; exit "$status"; }
-          trap cleanup EXIT
-          sleep 5
-          test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
-          docker exec "$cid" grep -F 'handle @xhttp' /data/Caddyfile
-          docker exec "$cid" grep -F 'reverse_proxy 127.0.0.1:8080' /data/Caddyfile
-
-      - name: Smoke test client mode
+      - name: Smoke test udp2faketcp server mode
         run: |
           set -eux
           cid=$(docker run -d \
-            -e PEERS=s1 \
-            -e S1_DOMAIN=localhost \
-            -e S1_FORWARD_UUID=00000000-0000-4000-8000-000000000001 \
-            -e S1_REVERSE_UUID=00000000-0000-4000-8000-000000000002 \
-            -e S1_LOCAL_VTEP_IP=127.0.0.2 \
+            -e UDP2FAKETCP_MODE=server \
+            -e UDP2FAKETCP_LISTEN=0.0.0.0:51820 \
+            -e UDP2FAKETCP_REMOTE=127.0.0.1:51820 \
             xtunnel:ci)
           cleanup() { status=$?; docker logs "$cid" || true; docker rm -f "$cid" || true; exit "$status"; }
           trap cleanup EXIT
           sleep 5
           test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
+          docker exec "$cid" pidof udp2faketcp
+
+      - name: Smoke test udp2faketcp client mode
+        run: |
+          set -eux
+          cid=$(docker run -d \
+            -e UDP2FAKETCP_MODE=client \
+            -e UDP2FAKETCP_LISTEN=0.0.0.0:51820 \
+            -e UDP2FAKETCP_REMOTE=127.0.0.1:51820 \
+            xtunnel:ci)
+          cleanup() { status=$?; docker logs "$cid" || true; docker rm -f "$cid" || true; exit "$status"; }
+          trap cleanup EXIT
+          sleep 5
+          test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
+          docker exec "$cid" pidof udp2faketcp
 
       - name: Scan smoke image
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0

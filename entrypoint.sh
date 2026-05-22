@@ -1,27 +1,29 @@
 #!/bin/sh
 set -e
 
-: "${PHANTUN_LOCAL:=0.0.0.0:51820}"
-: "${PHANTUN_REMOTE:?PHANTUN_REMOTE is required, for example lax.newco.homes:18443}"
-: "${PHANTUN_TUN:=phantun0}"
-: "${PHANTUN_TUN_LOCAL:=192.168.200.1}"
-: "${PHANTUN_TUN_PEER:=192.168.200.2}"
-: "${PHANTUN_IPV4_ONLY:=1}"
+: "${UDP2FAKETCP_MODE:=client}"
+: "${UDP2FAKETCP_LISTEN:=0.0.0.0:51820}"
+: "${UDP2FAKETCP_REMOTE:?UDP2FAKETCP_REMOTE is required, for example lax.newco.homes:51820}"
+: "${UDP2FAKETCP_TTL:=180}"
+: "${UDP2FAKETCP_MTU:=1440}"
 
-if [ -n "${PHANTUN_GATEWAY:-}" ]; then
-  if [ "${PHANTUN_GATEWAY_ONLINK:-0}" = 1 ]; then
-    OUT_IF=${PHANTUN_OUT_IF:-$(ip -o link show | awk -F': ' '$2 != "lo" { sub(/@.*/, "", $2); print $2; exit }')}
-    : "${OUT_IF:?PHANTUN_OUT_IF is required when no non-loopback interface is found}"
-    ip route replace default via "$PHANTUN_GATEWAY" dev "$OUT_IF" onlink
-  else
-    ip route replace default via "$PHANTUN_GATEWAY"
-  fi
-fi
+case "$UDP2FAKETCP_MODE" in
+  client)
+    mode_flag=-c
+    ;;
+  server)
+    mode_flag=-s
+    ;;
+  *)
+    echo "Unsupported UDP2FAKETCP_MODE: $UDP2FAKETCP_MODE" >&2
+    exit 1
+    ;;
+esac
 
-args="--local $PHANTUN_LOCAL --remote $PHANTUN_REMOTE --tun $PHANTUN_TUN --tun-local $PHANTUN_TUN_LOCAL --tun-peer $PHANTUN_TUN_PEER"
-if [ "$PHANTUN_IPV4_ONLY" = 1 ] || [ "$PHANTUN_IPV4_ONLY" = true ] || [ "$PHANTUN_IPV4_ONLY" = yes ]; then
-  args="$args --ipv4-only"
+args="$mode_flag -l $UDP2FAKETCP_LISTEN -r $UDP2FAKETCP_REMOTE -t $UDP2FAKETCP_TTL -m $UDP2FAKETCP_MTU"
+if [ "${UDP2FAKETCP_DEBUG:-0}" = 1 ] || [ "${UDP2FAKETCP_DEBUG:-0}" = true ] || [ "${UDP2FAKETCP_DEBUG:-0}" = yes ]; then
+  args="$args -d"
 fi
 
 # shellcheck disable=SC2086
-exec phantun_client $args
+exec udp2faketcp $args
