@@ -24,7 +24,7 @@ RUN : "${TARGETARCH:?TARGETARCH is required}" \
 # Stage 2: Minimal runtime image
 FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 
-RUN apk add --no-cache ca-certificates iptables
+RUN apk add --no-cache ca-certificates
 
 COPY --from=phantun-builder /usr/local/bin/phantun_client /usr/local/bin/phantun_client
 COPY --from=phantun-builder /usr/local/bin/phantun_server /usr/local/bin/phantun_server
