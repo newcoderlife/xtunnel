@@ -1,43 +1,40 @@
 # syntax=docker/dockerfile:1.7
 
-# Stage 1: Download shadowsocks-rust binaries
-FROM --platform=$BUILDPLATFORM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS ss-builder
+# Stage 1: Download Phantun binaries
+FROM --platform=$BUILDPLATFORM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS phantun-builder
 
 ARG TARGETARCH
 ARG TARGETVARIANT
-ARG SSRUST_VERSION=v1.24.0
+ARG PHANTUN_VERSION=v0.8.1
 RUN : "${TARGETARCH:?TARGETARCH is required}" \
-    && apk add --no-cache ca-certificates curl xz \
+    && apk add --no-cache ca-certificates curl unzip \
     && case "${TARGETARCH}/${TARGETVARIANT}" in \
-        amd64/) SS_TARGET="x86_64-unknown-linux-musl"; SS_SHA256="0d84f5f350ec99396867d718f146fc3810975b2a7cd06192f158d96bdef460e7" ;; \
-        arm64/|arm64/v8) SS_TARGET="aarch64-unknown-linux-musl"; SS_SHA256="e00b6551f40bb2d61adb2503909e0df6550c022372c812f3f34350510797ef2f" ;; \
-        arm/|arm/v7) SS_TARGET="armv7-unknown-linux-musleabihf"; SS_SHA256="99ca0a319ef19b966f054b188e9adaede948d476a98cbd2aa9fed7c8c1d37c58" ;; \
+        amd64/) PHANTUN_TARGET="x86_64-unknown-linux-musl"; PHANTUN_SHA256="0cf40f0ac48411f8ced94ce0afd617105c6b9a69ad8db137c3b1e4d184d6fcdb" ;; \
+        arm64/|arm64/v8) PHANTUN_TARGET="aarch64-unknown-linux-musl"; PHANTUN_SHA256="e3f2336b5173df071c8931b5e0e3d44c57453da0456007ed459ed369610c91fa" ;; \
+        arm/|arm/v7) PHANTUN_TARGET="armv7-unknown-linux-musleabihf"; PHANTUN_SHA256="71f16f7a18c2ac98f3fec482d99a0e69540966cb867309f615617567d5d2f30f" ;; \
         *) echo "Unsupported TARGETARCH/TARGETVARIANT: ${TARGETARCH}/${TARGETVARIANT}" >&2; exit 1 ;; \
       esac \
-    && SS_ARCHIVE="shadowsocks-${SSRUST_VERSION}.${SS_TARGET}.tar.xz" \
-    && curl -fsSL "https://github.com/shadowsocks/shadowsocks-rust/releases/download/${SSRUST_VERSION}/${SS_ARCHIVE}" -o "/tmp/${SS_ARCHIVE}" \
-    && printf '%s  %s\n' "$SS_SHA256" "/tmp/${SS_ARCHIVE}" | sha256sum -c - \
-    && tar -xJf "/tmp/${SS_ARCHIVE}" -C /usr/local/bin sslocal ssserver \
-    && chmod +x /usr/local/bin/sslocal /usr/local/bin/ssserver \
-    && rm -f "/tmp/${SS_ARCHIVE}"
+    && PHANTUN_ARCHIVE="phantun_${PHANTUN_TARGET}.zip" \
+    && curl -fsSL "https://github.com/dndx/phantun/releases/download/${PHANTUN_VERSION}/${PHANTUN_ARCHIVE}" -o "/tmp/${PHANTUN_ARCHIVE}" \
+    && printf '%s  %s\n' "$PHANTUN_SHA256" "/tmp/${PHANTUN_ARCHIVE}" | sha256sum -c - \
+    && unzip "/tmp/${PHANTUN_ARCHIVE}" -d /usr/local/bin \
+    && chmod +x /usr/local/bin/phantun_client /usr/local/bin/phantun_server \
+    && rm -f "/tmp/${PHANTUN_ARCHIVE}"
 
 # Stage 2: Minimal runtime image
 FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 
-RUN apk add --no-cache ca-certificates libcap \
-    && addgroup -S tunnel && adduser -S -G tunnel tunnel \
-    && mkdir -p /data && chown -R tunnel:tunnel /data
+RUN apk add --no-cache ca-certificates iptables
 
-COPY --from=ss-builder /usr/local/bin/sslocal /usr/local/bin/sslocal
-COPY --from=ss-builder /usr/local/bin/ssserver /usr/local/bin/ssserver
-RUN setcap cap_net_bind_service=+ep /usr/local/bin/ssserver
+COPY --from=phantun-builder /usr/local/bin/phantun_client /usr/local/bin/phantun_client
+COPY --from=phantun-builder /usr/local/bin/phantun_server /usr/local/bin/phantun_server
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 COPY LICENSE /usr/share/licenses/xtunnel/LICENSE
 
-EXPOSE 16384/udp
+ENV RUST_LOG=info
+EXPOSE 51820/udp
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD pidof ssserver >/dev/null || pidof sslocal >/dev/null || exit 1
+    CMD pidof phantun_client >/dev/null || pidof phantun_server >/dev/null || exit 1
 
-USER tunnel
 ENTRYPOINT ["/entrypoint.sh"]

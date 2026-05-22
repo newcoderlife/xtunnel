@@ -1,64 +1,29 @@
 #!/bin/sh
-set -ex
+set -e
 
-D=/data; P=; K=; PD=; PL=
-: "${VXLAN_PORT:=4789}" "${PEERS:=}" "${SS2022_METHOD:=2022-blake3-aes-128-gcm}" "${SS2022_PASSWORD:=YuV9jUXztSPJ4QgMZrFMdw==}"
-: "${SS2022_SERVER_PORT:=16384}" "${SS2022_REMOTE_ADDRESS:=127.0.0.1}" "${SS2022_REMOTE_PORT:=$VXLAN_PORT}"
-ROUTER_IP=${ROUTER_IP:-$(ip route | awk '/default/ {print $3; exit}')}
-: "${ROUTER_IP:?ROUTER_IP is required}"
-mkdir -p "$D"
+: "${PHANTUN_LOCAL:=0.0.0.0:51820}"
+: "${PHANTUN_REMOTE:?PHANTUN_REMOTE is required, for example lax.newco.homes:18443}"
+: "${PHANTUN_TUN:=phantun0}"
+: "${PHANTUN_TUN_LOCAL:=192.168.200.1}"
+: "${PHANTUN_TUN_PEER:=192.168.200.2}"
+: "${PHANTUN_IPV4_ONLY:=1}"
 
-peer() {
-  P=$1; case $P in [!A-Za-z_]*|*[!A-Za-z0-9_-]*) echo "Invalid peer: $P" >&2; exit 1;; esac
-  K=$(printf '%s' "$P" | tr '[:lower:]-' '[:upper:]_')
-  eval "PD=\${${K}_DOMAIN:-}"; eval "PL=\${${K}_LOCAL_VTEP_IP:-}"
-  : "${PD:?${K}_DOMAIN is required}" "${PL:?${K}_LOCAL_VTEP_IP is required}"
-}
-
-peers() { printf '%s\n' "$PEERS" | tr ',' '\n'; }
-
-if [ -n "${PEERS:-}" ]; then
-  pids=
-  for P in $(peers); do
-    [ -z "$P" ] && continue
-    peer "$P"
-    cat >"$D/client-$P.json" <<EOF
-{
-  "server": "$PD",
-  "server_port": $SS2022_SERVER_PORT,
-  "method": "$SS2022_METHOD",
-  "password": "$SS2022_PASSWORD",
-  "timeout": 600,
-  "locals": [
-    {
-      "protocol": "tunnel",
-      "local_address": "$PL",
-      "local_port": $VXLAN_PORT,
-      "forward_address": "$SS2022_REMOTE_ADDRESS",
-      "forward_port": $SS2022_REMOTE_PORT,
-      "mode": "udp_only"
-    }
-  ]
-}
-EOF
-    sslocal -c "$D/client-$P.json" &
-    pids="$pids $!"
-  done
-  # shellcheck disable=SC2086
-  wait $pids
-  exit $?
+if [ -n "${PHANTUN_GATEWAY:-}" ]; then
+  ip route replace default via "$PHANTUN_GATEWAY"
 fi
 
-: "${DOMAIN:?DOMAIN is required}" "${VTEP_IP:?VTEP_IP is required}"
-cat >"$D/server.json" <<EOF
-{
-  "server": "0.0.0.0",
-  "server_port": $SS2022_SERVER_PORT,
-  "method": "$SS2022_METHOD",
-  "password": "$SS2022_PASSWORD",
-  "mode": "tcp_and_udp",
-  "timeout": 600
-}
-EOF
+OUT_IF=${PHANTUN_OUT_IF:-$(ip route show default 2>/dev/null | awk '{print $5; exit}')}
+if [ -z "$OUT_IF" ]; then
+  OUT_IF=${PHANTUN_OUT_IF:-eth0}
+fi
 
-exec ssserver -c "$D/server.json"
+iptables -t nat -C POSTROUTING -i "$PHANTUN_TUN" -o "$OUT_IF" -j MASQUERADE 2>/dev/null \
+  || iptables -t nat -A POSTROUTING -i "$PHANTUN_TUN" -o "$OUT_IF" -j MASQUERADE
+
+args="--local $PHANTUN_LOCAL --remote $PHANTUN_REMOTE --tun $PHANTUN_TUN --tun-local $PHANTUN_TUN_LOCAL --tun-peer $PHANTUN_TUN_PEER"
+if [ "$PHANTUN_IPV4_ONLY" = 1 ] || [ "$PHANTUN_IPV4_ONLY" = true ] || [ "$PHANTUN_IPV4_ONLY" = yes ]; then
+  args="$args --ipv4-only"
+fi
+
+# shellcheck disable=SC2086
+exec phantun_client $args
