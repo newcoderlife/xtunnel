@@ -10,7 +10,9 @@ set -e
 
 if [ -n "${PHANTUN_GATEWAY:-}" ]; then
   if [ "${PHANTUN_GATEWAY_ONLINK:-0}" = 1 ]; then
-    ip route replace default via "$PHANTUN_GATEWAY" dev "${PHANTUN_OUT_IF:-eth0}" onlink
+    OUT_IF=${PHANTUN_OUT_IF:-$(ip -o link show | awk -F': ' '$2 != "lo" { sub(/@.*/, "", $2); print $2; exit }')}
+    : "${OUT_IF:?PHANTUN_OUT_IF is required when no non-loopback interface is found}"
+    ip route replace default via "$PHANTUN_GATEWAY" dev "$OUT_IF" onlink
   else
     ip route replace default via "$PHANTUN_GATEWAY"
   fi
