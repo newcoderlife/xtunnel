@@ -3,7 +3,7 @@ ARG CADDY_VERSION=2.11.2
 ARG CADDY_IMAGE_DIGEST=sha256:834468128c7696cec0ceea6172f7d692daf645ae51983ca76e39da54a97c570d
 
 # Stage 1: Download Xray binary
-FROM --platform=$BUILDPLATFORM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS xray-builder
+FROM --platform=$BUILDPLATFORM alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4 AS xray-builder
 
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -27,7 +27,7 @@ FROM --platform=$TARGETPLATFORM caddy:${CADDY_VERSION}-alpine@${CADDY_IMAGE_DIGE
 ARG CADDY_VERSION
 
 # Stage 3: Minimal runtime image
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+FROM alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
 
 RUN apk add --no-cache ca-certificates libcap \
     && addgroup -S tunnel && adduser -S -G tunnel tunnel \
